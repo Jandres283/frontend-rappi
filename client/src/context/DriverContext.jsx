@@ -1,6 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
-// ✅ Importación por defecto (sin llaves)
 import useAuth from "./AuthContext"; 
 import api from "@/api/axios";
 
@@ -39,7 +38,7 @@ export const DriverProvider = ({ children }) => {
     let isMounted = true;
 
     const loadDriverData = async () => {
-      // 🛑 GUARDIA 1: Verificar Token
+      // GUARDIA 1: Verificar Token
       const token =
         localStorage.getItem("token") ||
         localStorage.getItem("accessToken") ||
@@ -51,13 +50,13 @@ export const DriverProvider = ({ children }) => {
         return;
       }
 
-      // 🛑 GUARDIA 2: Verificar usuario
+      // GUARDIA 2: Verificar usuario
       if (!user || typeof user !== "object") {
         if (isMounted) setLoading(false);
         return;
       }
 
-      // 🛑 GUARDIA 3: Roles
+      // GUARDIA 3: Roles
       const userRole = String(user.role || "").toLowerCase();
       const allowedRoles = ["driver", "repartidor", "delivery", "admin"];
       if (userRole && !allowedRoles.includes(userRole)) {

@@ -1,22 +1,44 @@
-import { useState } from "react";
+/* eslint-disable */
+import { useState, useEffect } from "react";
 import "./NewsModalForm.scss";
 
 export const NewsModalForm = ({ isOpen, onClose, onSubmit, currentNews }) => {
-  // Inicialización directa del estado según la noticia recibida
   const [formData, setFormData] = useState({
-    title: currentNews?.title || "",
-    category: currentNews?.category || "Novedades",
-    content: currentNews?.content || currentNews?.description || "",
-    active: currentNews?.active ?? true,
+    title: "",
+    category: "Novedades",
+    content: "",
+    active: true,
     file: null,
   });
+
+  useEffect(() => {
+    if (isOpen) {
+      if (currentNews) {
+        setFormData({
+          title: currentNews.title || "",
+          category: currentNews.category || "Novedades",
+          content: currentNews.content || currentNews.description || "",
+          active: currentNews.active ?? true,
+          file: null,
+        });
+      } else {
+        setFormData({
+          title: "",
+          category: "Novedades",
+          content: "",
+          active: true,
+          file: null,
+        });
+      }
+    }
+  }, [isOpen, currentNews]);
 
   if (!isOpen) return null;
 
   const handleChange = (e) => {
     const { name, value, files, type, checked } = e.target;
     if (type === "file") {
-      setFormData((prev) => ({ ...prev, file: files ? files[0] : null }));
+      setFormData((prev) => ({ ...prev, file: files && files[0] ? files[0] : null }));
     } else if (type === "checkbox") {
       setFormData((prev) => ({ ...prev, [name]: checked }));
     } else {
@@ -26,19 +48,16 @@ export const NewsModalForm = ({ isOpen, onClose, onSubmit, currentNews }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (onSubmit) {
-      const body = new FormData();
-      body.append("title", formData.title);
-      body.append("category", formData.category);
-      body.append("content", formData.content);
-      body.append("active", String(formData.active));
+    if (!onSubmit) return;
 
-      if (formData.file) {
-        body.append("miniature", formData.file);
-      }
-
-      onSubmit(body);
-    }
+    onSubmit({
+      title: formData.title.trim(),
+      category: formData.category,
+      content: formData.content.trim(),
+      description: formData.content.trim(),
+      active: formData.active,
+      file: formData.file,
+    });
   };
 
   return (

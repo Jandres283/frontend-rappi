@@ -107,8 +107,14 @@ const getInitialAuthState = () => {
   const { USER_KEY, TOKEN_KEY } = getRoleStorageKeys(currentRole);
 
   try {
-    const savedToken = localStorage.getItem(TOKEN_KEY);
-    const savedUser = localStorage.getItem(USER_KEY);
+    const savedToken =
+      localStorage.getItem(TOKEN_KEY) ||
+      localStorage.getItem("token") ||
+      localStorage.getItem("accessToken");
+
+    const savedUser =
+      localStorage.getItem(USER_KEY) ||
+      localStorage.getItem("user");
 
     if (savedToken && savedUser) {
       const parsedUser = normalizeUser(savedUser);
@@ -116,8 +122,8 @@ const getInitialAuthState = () => {
         return { token: savedToken, user: parsedUser };
       }
     }
-  } catch (e) {
-    // Red silenciosa
+  } catch {
+    // Silencioso
   }
 
   return { token: null, user: null };
@@ -138,7 +144,7 @@ export const AuthProvider = ({ children }) => {
       `${apiBase}/auth/me`,
       `${apiBase}/clients/${userId || "me"}`,
       `http://localhost:3977/api/users/${userId || "me"}`,
-      `http://localhost:3977/api/auth/me`
+      `http://localhost:3977/api/auth/me`,
     ];
 
     for (const url of endpoints) {
@@ -160,6 +166,7 @@ export const AuthProvider = ({ children }) => {
             const { USER_KEY } = getRoleStorageKeys(normalized.role || currentRole);
 
             localStorage.setItem(USER_KEY, JSON.stringify(normalized));
+            localStorage.setItem("user", JSON.stringify(normalized));
 
             if (normalized.role === getTargetRoleFromLocation()) {
               setAuthState((prev) => ({ ...prev, user: normalized }));
@@ -168,8 +175,8 @@ export const AuthProvider = ({ children }) => {
             return;
           }
         }
-      } catch (e) {
-        // Red silenciosa
+      } catch {
+        // Silencioso
       }
     }
   }, []);
@@ -198,8 +205,8 @@ export const AuthProvider = ({ children }) => {
       try {
         const newState = getInitialAuthState();
         setAuthState(newState);
-      } catch (e) {
-        console.error("Error al sincronizar auth state:", e);
+      } catch (err) {
+        console.error("Error al sincronizar auth state:", err);
       }
     };
 
@@ -246,8 +253,13 @@ export const AuthProvider = ({ children }) => {
         const normalizedUser = normalizeUser(extractedUser);
         const { USER_KEY, TOKEN_KEY } = getRoleStorageKeys(normalizedUser.role);
 
+        // Claves específicas por rol y globales
         localStorage.setItem(TOKEN_KEY, extractedToken);
+        localStorage.setItem("token", extractedToken);
+        localStorage.setItem("accessToken", extractedToken);
+
         localStorage.setItem(USER_KEY, JSON.stringify(normalizedUser));
+        localStorage.setItem("user", JSON.stringify(normalizedUser));
 
         setAuthState({ token: extractedToken, user: normalizedUser });
 
@@ -257,8 +269,8 @@ export const AuthProvider = ({ children }) => {
         }
 
         window.dispatchEvent(new Event("auth-change"));
-      } catch (error) {
-        console.error("Error al procesar el inicio de sesión:", error);
+      } catch (err) {
+        console.error("Error al procesar el inicio de sesión:", err);
       } finally {
         setIsLoading(false);
       }
@@ -276,8 +288,8 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem(TOKEN_KEY);
       }
 
-      // Limpieza general de seguridad
       localStorage.removeItem("token");
+      localStorage.removeItem("accessToken");
       localStorage.removeItem("user");
 
       setAuthState({ token: null, user: null });
@@ -295,8 +307,9 @@ export const AuthProvider = ({ children }) => {
       try {
         const { USER_KEY } = getRoleStorageKeys(normalized.role);
         localStorage.setItem(USER_KEY, JSON.stringify(normalized));
-      } catch (e) {
-        console.error("Error guardando usuario actualizado:", e);
+        localStorage.setItem("user", JSON.stringify(normalized));
+      } catch (err) {
+        console.error("Error guardando usuario actualizado:", err);
       }
 
       return { ...prev, user: normalized };

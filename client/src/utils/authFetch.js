@@ -5,22 +5,23 @@ const authFetch = axios.create({
   baseURL: ENV.BASE_API,
 });
 
-// Interceptor para enviar el Token correspondiente según la App activa
+// Interceptor para enviar el Token estándar
 authFetch.interceptors.request.use(
   (config) => {
     let token = ENV.GET_TOKEN();
-    
+
     if (token) {
-      // Limpia comillas dobles residuales si se guardó mal
       token = token.replace(/^"(.*)"$/, "$1").trim();
-      config.headers.Authorization = `Bearer ${token}`;
+      // Solo enviamos Authorization (formato aceptado por CORS y por ensureAuth)
+      config.headers.Authorization = token.startsWith("Bearer ")
+        ? token
+        : `Bearer ${token}`;
     }
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// Interceptor para capturar tokens expirados o desautorizados
 authFetch.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -31,4 +32,5 @@ authFetch.interceptors.response.use(
   }
 );
 
+export default authFetch;
 export { authFetch };

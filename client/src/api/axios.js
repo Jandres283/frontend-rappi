@@ -16,8 +16,15 @@ instance.interceptors.request.use(
       localStorage.getItem("auth_token_jwt");
 
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      const cleanToken = token.replace(/^"(.*)"$/, "$1");
+
+      // ⚠️ IMPORTANTE: Usamos SOLO Authorization. 
+      // No agregamos config.headers.token porque el CORS de Render lo bloquea.
+      config.headers.Authorization = cleanToken.startsWith("Bearer ")
+        ? cleanToken
+        : `Bearer ${cleanToken}`;
     }
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -39,7 +46,7 @@ instance.interceptors.response.use(
       requestUrl.includes("/login");
 
     if ((status === 401 || status === 403) && !isAuthEndpoint) {
-      console.warn("Sesión caducada o token inválido. Limpiando credenciales del navegador...");
+      console.warn("Sesión caducada o token inválido. Limpiando credenciales...");
 
       if (ENV?.STORAGE?.TOKEN) localStorage.removeItem(ENV.STORAGE.TOKEN);
       if (ENV?.STORAGE?.USER) localStorage.removeItem(ENV.STORAGE.USER);

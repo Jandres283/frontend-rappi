@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import api from "@/api/axios";
 import NewsTable from "@/components/Admin/News/NewsTable";
 import NewsModalForm from "@/components/Admin/News/NewsModalForm";
@@ -15,14 +15,15 @@ export const NewsPage = () => {
   const [filterCategory, setFilterCategory] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
 
-  const parseNewsData = useCallback((data) => {
+  const parseNewsData = (data) => {
     if (!data) return [];
     if (Array.isArray(data)) return data;
     if (Array.isArray(data.docs)) return data.docs;
     if (Array.isArray(data.news)) return data.news;
     if (Array.isArray(data.data)) return data.data;
+    if (data.data && Array.isArray(data.data.docs)) return data.data.docs;
     return [];
-  }, []);
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -41,10 +42,11 @@ export const NewsPage = () => {
     };
 
     fetchNews();
+
     return () => {
       isMounted = false;
     };
-  }, [reloadTrigger, parseNewsData]);
+  }, [reloadTrigger]);
 
   const reloadNews = () => setReloadTrigger((prev) => prev + 1);
 
@@ -86,19 +88,21 @@ export const NewsPage = () => {
 
   const handleSubmitForm = async (payload) => {
     try {
-      let formDataToSend;
+      setIsLoading(true);
 
-      if (payload instanceof FormData) {
-        formDataToSend = payload;
-      } else {
-        formDataToSend = new FormData();
-        Object.keys(payload).forEach((key) => {
-          if (payload[key] !== undefined && payload[key] !== null) {
-            formDataToSend.append(key, payload[key]);
-          }
-        });
+      const formDataToSend = new FormData();
+      formDataToSend.append("title", payload.title);
+      formDataToSend.append("category", payload.category);
+      formDataToSend.append("content", payload.content);
+      formDataToSend.append("description", payload.description || payload.content);
+      formDataToSend.append("active", payload.active ? "true" : "false");
+
+      if (payload.file) {
+        formDataToSend.append("miniature", payload.file);
       }
 
+      // No sobreescribimos cabeceras manualmente para evitar bloqueos de CORS.
+      // La instancia `api` adjuntará 'Authorization: Bearer <token>' mediante su interceptor.
       if (currentNews) {
         const id = currentNews._id || currentNews.id;
         await api.patch(`/news/${id}`, formDataToSend);
@@ -106,10 +110,10 @@ export const NewsPage = () => {
         await api.post("/news", formDataToSend);
       }
 
+      alert("¡Noticia procesada exitosamente!");
       setIsModalOpen(false);
       setCurrentNews(null);
 
-      // Reiniciar filtros para asegurar visibilidad inmediata
       setSearchTerm("");
       setFilterCategory("all");
       setFilterStatus("all");
@@ -117,7 +121,13 @@ export const NewsPage = () => {
       reloadNews();
     } catch (error) {
       console.error("Error al procesar la noticia:", error);
-      alert(error?.response?.data?.msg || "Error al guardar la noticia en el servidor.");
+      const msg =
+        error?.response?.data?.msg ||
+        error?.response?.data?.message ||
+        "Error en el servidor al guardar la noticia.";
+      alert(`Error: ${msg}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -128,6 +138,11 @@ export const NewsPage = () => {
       reloadNews();
     } catch (error) {
       console.error("Error al eliminar la noticia:", error);
+      const msg =
+        error?.response?.data?.msg ||
+        error?.response?.data?.message ||
+        "Error al intentar eliminar la noticia.";
+      alert(`Error: ${msg}`);
     }
   };
 
@@ -215,7 +230,6 @@ export const NewsPage = () => {
       </main>
 
       <NewsModalForm
-        key={currentNews ? (currentNews._id || currentNews.id) : (isModalOpen ? "open" : "closed")}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleSubmitForm}

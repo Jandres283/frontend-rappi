@@ -1,9 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { useAuth } from "@/hooks"; // Para asociar el restaurante al usuario autenticado
-import { getImageUrl } from "@/utils"; // Helper centralizado de imágenes
-import api from "@/api/axios"; // Usar la instancia centralizada de Axios
-
+import { useAuth } from "@/hooks";
+import { getImageUrl } from "@/utils";
+import api from "@/api/axios";
 
 export const RestaurantContext = createContext(null);
 
@@ -17,7 +16,6 @@ export const RestaurantProvider = ({ children }) => {
   const [isOpen, setIsOpen] = useState(true);
   const [reloadTrigger, setReloadTrigger] = useState(0);
 
-  // Extraer ID de usuario único para la dependencia limpia del useEffect
   const userId = user?._id || user?.id;
 
   const refetchData = useCallback(() => {
@@ -31,7 +29,7 @@ export const RestaurantProvider = ({ children }) => {
       try {
         setLoading(true);
 
-        // 1. Obtener lista global de restaurantes usando Axios
+        // 1. Obtener lista global de restaurantes
         const resResto = await api.get("/restaurants");
         const data = resResto.data;
         const rawList = data.docs || (Array.isArray(data) ? data : []);
@@ -50,7 +48,6 @@ export const RestaurantProvider = ({ children }) => {
         if (isMounted) {
           setRestaurants(formattedList);
 
-          // Búsqueda flexible de restaurante asociado al usuario
           if (formattedList.length > 0) {
             if (userId) {
               const myId = String(userId);
@@ -96,7 +93,7 @@ export const RestaurantProvider = ({ children }) => {
     return () => {
       isMounted = false;
     };
-  }, [reloadTrigger, userId]); // 👈 Dependencia sintácticamente válida y limpia
+  }, [reloadTrigger, userId]);
 
   const updateOrderStatus = (orderId, status) => {
     setPendingOrders((prev) =>
