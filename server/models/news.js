@@ -19,13 +19,12 @@ const NewsSchema = new mongoose.Schema(
     },
     category: {
       type: String,
-      default: "news",
-      lowercase: true,
+      default: "Novedades",
       trim: true,
     },
     isFeatured: {
       type: Boolean,
-      default: false, // Para destacar en un banner o carrusel principal
+      default: false,
     },
     active: {
       type: Boolean,
@@ -34,7 +33,7 @@ const NewsSchema = new mongoose.Schema(
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: [true, "La noticia debe estar asociada a un autor"],
+      required: false,
     },
   },
   {
@@ -42,10 +41,9 @@ const NewsSchema = new mongoose.Schema(
   }
 );
 
-// Índices para optimizar búsquedas por estado y noticias destacadas
 NewsSchema.index({ active: 1, createdAt: -1 });
 NewsSchema.index({ isFeatured: 1 });
 
 NewsSchema.plugin(mongoosePaginate);
 
-module.exports = mongoose.model("News", NewsSchema);
+module.exports = mongoose.models.News || mongoose.model("News", NewsSchema);

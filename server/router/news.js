@@ -1,36 +1,43 @@
 const express = require("express");
 const NewsController = require("../controllers/news");
-const mdAuth = require("../middlewares/authenticated");
-const mdRole = require("../middlewares/isRole");
+const { ensureAuth } = require("../middlewares/authenticated");
+const { isAdmin } = require("../middlewares/isRole");
 const upload = require("../middlewares/multer");
 
 const api = express.Router();
 
-// Garantizar que la función de autenticación exista (evita que se caiga el servidor)
-const authMiddleware = mdAuth?.ensureAuth || mdAuth?.asureAuth || ((req, res, next) => next());
-const roleMiddleware = mdRole?.isAdmin || ((req, res, next) => next());
+// 🟢 RUTAS PÚBLICAS (Lectura)
+api.get("/news", NewsController.getNews);
+api.get("/news/:id", NewsController.getOneNews);
 
-// Consultas públicas
-api.get("/news", NewsController.getNews || ((req, res) => res.json([])));
-api.get("/news/:id", NewsController.getOneNews || ((req, res) => res.json({})));
-
-// Operaciones protegidas (Solo Admin)
+// 🟢 CREAR NOTICIA
+// 1° Valida Token -> 2° Valida Rol Admin -> 3° Procesa Imagen FormData
 api.post(
   "/news",
-  [authMiddleware, roleMiddleware, upload("news").single("miniature")],
-  NewsController.createNews || ((req, res) => res.json({ msg: "Creado" }))
+  [
+    ensureAuth,
+    isAdmin,
+    upload("news").single("miniature"),
+  ],
+  NewsController.createNews
 );
 
+// 🟢 ACTUALIZAR NOTICIA
 api.patch(
   "/news/:id",
-  [authMiddleware, roleMiddleware, upload("news").single("miniature")],
-  NewsController.updateNews || ((req, res) => res.json({ msg: "Actualizado" }))
+  [
+    ensureAuth,
+    isAdmin,
+    upload("news").single("miniature"),
+  ],
+  NewsController.updateNews
 );
 
+// 🟢 ELIMINAR NOTICIA
 api.delete(
   "/news/:id",
-  [authMiddleware, roleMiddleware],
-  NewsController.deleteNews || ((req, res) => res.json({ msg: "Eliminado" }))
+  [ensureAuth, isAdmin],
+  NewsController.deleteNews
 );
 
 module.exports = api;

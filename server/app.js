@@ -39,7 +39,7 @@ app.use(
       "http://localhost:5173",
       "http://localhost:3000",
       "http://localhost:3977",
-      "https://frontend-rappi.vercel.app" // Cambia por tu dominio exacto de Vercel si es diferente
+      "https://frontend-rappi.vercel.app",
     ],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
@@ -79,21 +79,21 @@ apiRoutes.forEach((route) => {
   }
 });
 
-// 6. Manejo de Errores Global
-app.use((err, req, res, next) => {
-  console.error("🔥 Error no controlado:", err.stack);
-  res.status(500).json({
-    status: "error",
-    msg: "Ocurrió un error interno en el servidor.",
-    error: process.env.NODE_ENV === "development" ? err.message : undefined,
-  });
-});
-
-// 7. Ruta 404 No Encontrada
+// 6. Ruta 404 No Encontrada
 app.use((req, res) => {
   res.status(404).json({
     status: "error",
     msg: `La ruta '${req.originalUrl}' no fue encontrada en el servidor.`,
+  });
+});
+
+// 7. Manejo de Errores Global
+app.use((err, req, res, next) => {
+  console.error("🔥 Error no controlado:", err.stack || err);
+  res.status(500).json({
+    status: "error",
+    msg: "Ocurrió un error interno en el servidor.",
+    error: process.env.NODE_ENV === "development" ? err.message : undefined,
   });
 });
 
