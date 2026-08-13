@@ -9,7 +9,7 @@ import {
   FiX 
 } from "react-icons/fi";
 
-// ✅ Importación corregida: `useAuth` por defecto desde AuthContext y `useCart` desde su propio contexto
+// Importaciones de contextos
 import useAuth from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
 
@@ -49,7 +49,7 @@ const Header = ({
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showOrdersModal, setShowOrdersModal] = useState(false);
 
-  // 🔴 FILTRO CLAVE: La web pública solo debe considerar logueado al ROL CLIENTE
+  // FILTRO CLAVE: La web pública solo debe considerar logueado al ROL CLIENTE
   const isClientRole = user && (String(user.role).toLowerCase() === "client" || String(user.role).toLowerCase() === "cliente");
   const isClientAuthenticated = isAuthenticated && isClientRole;
 
@@ -262,6 +262,7 @@ const Header = ({
           <OrderHistoryModal 
             isOpen={showOrdersModal} 
             onClose={() => setShowOrdersModal(false)} 
+            user={normalizedUser}
           />
         </>
       )}

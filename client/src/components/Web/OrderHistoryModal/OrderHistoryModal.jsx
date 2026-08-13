@@ -10,7 +10,6 @@ import {
 } from "react-icons/fi";
 import "./OrderHistoryModal.scss";
 
-// ✅ Corregido para sincronizar variable de entorno con fallback
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1";
 
 const getStatusConfig = (rawStatus) => {
@@ -54,13 +53,10 @@ export const OrderHistoryModal = ({ isOpen, onClose, user: propUser }) => {
         }
       }
 
-      // 2. Extraer ID del usuario
-      const userId =
-        rawUser?._id ||
-        rawUser?.id ||
-        rawUser?.uid ||
-        rawUser?.user?._id ||
-        rawUser?.user?.id;
+      // 2. Extraer identificadores del usuario activo
+      const userId = rawUser?._id || rawUser?.id || rawUser?.uid || rawUser?.user?._id || rawUser?.user?.id;
+      const userName = (rawUser?.firstName || rawUser?.firstname || rawUser?.nombre || rawUser?.name || "").toLowerCase().trim();
+      const userPhone = (rawUser?.phone || rawUser?.telefono || "").trim();
 
       if (!token) {
         if (isMounted) {
@@ -93,15 +89,35 @@ export const OrderHistoryModal = ({ isOpen, onClose, user: propUser }) => {
             const data = await response.json();
             const rawList = Array.isArray(data) ? data : data.orders || data.data || [];
             
-            // Filtrar por userId si la lista devuelta es global
-            fetchedOrders = userId 
-              ? rawList.filter(o => {
-                  const oUser = o.user?._id || o.user?.id || o.user || o.userId;
-                  return !oUser || String(oUser) === String(userId);
-                })
-              : rawList;
+            // FILTRADO FLEXIBLE: Compara por ID, Nombre (ej: Ale Mendoza) o Teléfono
+            if (rawList.length > 0) {
+              fetchedOrders = rawList.filter(o => {
+                const oUser = o.user?._id || o.user?.id || o.user || o.userId || o.client?._id || o.client?.id;
+                const oClientName = (o.clientName || o.customerName || o.client?.name || o.client || o.nombreCliente || o.nombre || "").toLowerCase().trim();
+                const oPhone = (o.phone || o.telefono || o.clientPhone || "").trim();
 
-            break; // Detener bucle si la ruta respondió correctamente
+                // 1. Coincide ID
+                if (userId && oUser && String(oUser) === String(userId)) return true;
+                // 2. Coincide Nombre de cliente
+                if (userName && oClientName && (oClientName.includes(userName) || userName.includes(oClientName))) return true;
+                // 3. Coincide Teléfono
+                if (userPhone && oPhone && oPhone.includes(userPhone)) return true;
+
+                // Si la URL llamada ya era específica de ese usuario (/orders/user/ID), la aceptamos
+                if (url.includes('/user/')) return true;
+
+                return false;
+              });
+
+              // Si la búsqueda por filtro estricto dio 0 pero el endpoint era directo, devolvemos todo lo del endpoint
+              if (fetchedOrders.length === 0 && url.includes('/user/')) {
+                fetchedOrders = rawList;
+              }
+            } else {
+              fetchedOrders = [];
+            }
+
+            break; // Detener bucle si la llamada fue exitosa
           }
         } catch {
           // Continuar con la siguiente ruta candidata
@@ -110,7 +126,7 @@ export const OrderHistoryModal = ({ isOpen, onClose, user: propUser }) => {
 
       if (isMounted) {
         if (fetchedOrders) {
-          const sorted = fetchedOrders.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+          const sorted = fetchedOrders.sort((a, b) => new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0));
           setOrders(sorted);
         } else {
           setOrders([]);
