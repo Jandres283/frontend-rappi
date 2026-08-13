@@ -1,19 +1,28 @@
 import { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
+import { ENV } from '@/utils/constants';
 
-const API_URL = 'http://localhost:3977/api/v1';
-const SOCKET_URL = 'http://localhost:3977';
+// URLs dinámicas tomadas desde tus constantes globales
+const API_URL = ENV.API_URL;
+const SOCKET_URL = ENV.SERVER_HOST || ENV.BASE_PATH;
 
+// Conexión dinámica a Socket.io
 const socket = io(SOCKET_URL, {
   transports: ['websocket', 'polling'],
   autoConnect: true,
 });
 
+// Helper dinámico para tokens por rol
 const getAuthHeaders = () => {
-  const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+  const token =
+    (ENV.GET_TOKEN && ENV.GET_TOKEN()) ||
+    localStorage.getItem('token') ||
+    localStorage.getItem('access_token') ||
+    localStorage.getItem('admin_token_jwt');
+
   return {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(token ? { Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}` } : {}),
   };
 };
 
@@ -65,7 +74,7 @@ export const useOrders = () => {
     // ⚡ 1. Escuchar cuando el Cliente genera un nuevo pedido
     const handleNewOrder = (newOrder) => {
       if (!newOrder || (!newOrder._id && !newOrder.id)) return;
-      
+
       setOrders((prevOrders) => {
         const exists = prevOrders.some(
           (order) => (order._id || order.id) === (newOrder._id || newOrder.id)
@@ -85,11 +94,9 @@ export const useOrders = () => {
         );
 
         if (!exists) {
-          // Si el pedido no existía en el estado del Admin/Restaurante, lo agrega
           return [updatedOrder, ...prevOrders];
         }
 
-        // Si ya existía, actualiza sus campos
         return prevOrders.map((order) =>
           (order._id || order.id) === (updatedOrder._id || updatedOrder.id)
             ? updatedOrder
