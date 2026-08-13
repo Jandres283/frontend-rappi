@@ -5,21 +5,20 @@ const instance = axios.create({
   baseURL: ENV.API_URL,
 });
 
-// Interceptor para inyectar Token en cada petición
+// Interceptor para inyectar Token de forma inteligente según el Rol
 instance.interceptors.request.use(
   (config) => {
+    // Usamos el helper dinámico de constants.js
     const token =
+      ENV.GET_TOKEN() ||
       localStorage.getItem(ENV?.STORAGE?.TOKEN) ||
       localStorage.getItem("token") ||
       localStorage.getItem("accessToken") ||
-      localStorage.getItem("access") ||
       localStorage.getItem("auth_token_jwt");
 
     if (token) {
       const cleanToken = token.replace(/^"(.*)"$/, "$1");
 
-      // ⚠️ IMPORTANTE: Usamos SOLO Authorization. 
-      // No agregamos config.headers.token porque el CORS de Render lo bloquea.
       config.headers.Authorization = cleanToken.startsWith("Bearer ")
         ? cleanToken
         : `Bearer ${cleanToken}`;
@@ -50,12 +49,14 @@ instance.interceptors.response.use(
 
       if (ENV?.STORAGE?.TOKEN) localStorage.removeItem(ENV.STORAGE.TOKEN);
       if (ENV?.STORAGE?.USER) localStorage.removeItem(ENV.STORAGE.USER);
+      
+      localStorage.removeItem("admin_token_jwt");
+      localStorage.removeItem("client_token_jwt");
+      localStorage.removeItem("driver_token_jwt");
+      localStorage.removeItem("restaurant_token_jwt");
       localStorage.removeItem("token");
       localStorage.removeItem("accessToken");
-      localStorage.removeItem("access");
-      localStorage.removeItem("user");
       localStorage.removeItem("auth_token_jwt");
-      localStorage.removeItem("restaurantId");
 
       const currentPath = window.location.pathname;
       if (!currentPath.includes("/login") && !currentPath.includes("/register")) {
