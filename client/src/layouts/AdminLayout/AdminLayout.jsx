@@ -45,7 +45,7 @@ export const AdminLayout = () => {
               <LuUser className="user-icon" />
               <span className="user-email">{adminEmail}</span>
             </div>
-            <button onClick={handleLogout} className="logout-btn cursor-pointer">
+            <button type="button" onClick={handleLogout} className="logout-btn cursor-pointer">
               <LuLogOut className="logout-icon" />
               <span>Cerrar Sesión</span>
             </button>

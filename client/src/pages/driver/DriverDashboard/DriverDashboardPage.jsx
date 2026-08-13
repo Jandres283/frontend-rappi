@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import io from "socket.io-client";
 
-// ✅ Importaciones corregidas sin espacios ni erratas
+// ✅ Importaciones de componentes del Repartidor
 import {
   AvailableOrdersList,
   ActiveOrderCard,
@@ -42,6 +42,7 @@ export const DriverDashboardPage = () => {
   const [availableOrders, setAvailableOrders] = useState([]);
   const [activeOrder, setActiveOrder] = useState(null);
 
+  // 📜 Carga inicial del historial desde localStorage
   const [completedOrders, setCompletedOrders] = useState(() => {
     try {
       const saved = localStorage.getItem("driver_completed_orders");
@@ -77,7 +78,7 @@ export const DriverDashboardPage = () => {
   const isForbiddenRef = useRef(false);
   const socketRef = useRef(null);
 
-  // 🚪 LOGOUT SEGURO Y LIMPIEZA DE SESIÓN REPARTIDOR
+  // 🚪 LOGOUT SEGURO
   const handleLogout = () => {
     try {
       if (typeof logout === "function") {
@@ -97,6 +98,7 @@ export const DriverDashboardPage = () => {
     }
   };
 
+  // 💾 Persistencia local de pedidos completados
   useEffect(() => {
     try {
       localStorage.setItem("driver_completed_orders", JSON.stringify(completedOrders));
@@ -139,7 +141,7 @@ export const DriverDashboardPage = () => {
     }
   }, [isAvailable, activeOrder, user]);
 
-  // 📦 OBTENER ÓRDENES Y UNIRSE A SALA DE SOCKET
+  // 📦 OBTENER ÓRDENES SOLO CUANDO EL RESTAURANTE LAS SUBA O MARQUE COMO LISTAS
   const fetchOrdersData = useCallback(async () => {
     if (isForbiddenRef.current) return;
 
@@ -176,14 +178,19 @@ export const DriverDashboardPage = () => {
       if (generalRes?.status === 200 && generalRes?.data) {
         const allOrders = parseOrdersList(generalRes.data);
 
+        // 🎯 LÓGICA CLAVE: Solo mostrar a los conductores si el restaurante la subió/listó
+        // (Excluimos estados iniciales como PENDING o CREATED creados solo por el cliente)
         if (parsedAvail.length === 0) {
           parsedAvail = allOrders.filter((o) => {
             const st = String(o.status || "").toUpperCase();
             const driver = o.deliveryDriver || o.driver;
             const driverId = String(driver?._id || driver?.id || driver || "");
             const hasNoDriver = !driver || driverId === "" || driverId === "null" || driverId === "undefined";
-            const isAvailableStatus = ["READY", "LISTO", "PREPARING", "EN_PREPARACION", "PENDING", "PENDIENTE"].includes(st);
-            return isAvailableStatus && hasNoDriver;
+
+            // 🛑 Solo disponible si el restaurante la subió/confirmó para entrega (Ej: READY / LISTO / PUBLISHED)
+            const isRestaurantApproved = ["READY", "LISTO", "READY_FOR_PICKUP", "PREPARING_DISPATCH", "PREPARADO"].includes(st);
+
+            return isRestaurantApproved && hasNoDriver;
           });
         }
 
@@ -220,7 +227,7 @@ export const DriverDashboardPage = () => {
       }
 
       setCompletedOrders(() => {
-        const combined = [...parsedHistory, ...localSaved];
+        const combined = [...localSaved, ...parsedHistory];
         const uniqueMap = new Map();
         combined.forEach((item) => {
           const id = item._id || item.id || item.code;
@@ -251,8 +258,10 @@ export const DriverDashboardPage = () => {
       console.log("⚡ Repartidor conectado vía Sockets:", socket.id);
     });
 
+    // Eventos emitidos cuando un restaurante publica o actualiza el pedido
     socket.on("order_updated", () => fetchOrdersData());
     socket.on("new_order", () => fetchOrdersData());
+    socket.on("restaurant_order_ready", () => fetchOrdersData());
 
     return () => {
       if (socket) {
@@ -262,7 +271,7 @@ export const DriverDashboardPage = () => {
     };
   }, [fetchOrdersData]);
 
-  // 👤 CARGAR PERFIL REPARTIDOR
+  // 👤 CARGAR PERFIL
   useEffect(() => {
     let isMounted = true;
 
@@ -456,7 +465,18 @@ export const DriverDashboardPage = () => {
       </header>
 
       {hasPermissionError && (
-        <div className="permission-error-banner" style={{ backgroundColor: "#ffebee", color: "#c62828", padding: "12px 20px", borderRadius: "8px", margin: "15px 0", border: "1px solid #ef9a9a", fontWeight: "bold" }}>
+        <div
+          className="permission-error-banner"
+          style={{
+            backgroundColor: "#ffebee",
+            color: "#c62828",
+            padding: "12px 20px",
+            borderRadius: "8px",
+            margin: "15px 0",
+            border: "1px solid #ef9a9a",
+            fontWeight: "bold",
+          }}
+        >
           ⚠️ No tienes permisos suficientes o tu sesión expiró.
         </div>
       )}
@@ -526,10 +546,18 @@ export const DriverDashboardPage = () => {
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                marginTop: "6px"
+                marginTop: "6px",
               }}
             >
-              <span style={{ height: "10px", width: "10px", backgroundColor: "#fff", borderRadius: "50%", display: "inline-block" }}></span>
+              <span
+                style={{
+                  height: "10px",
+                  width: "10px",
+                  backgroundColor: "#fff",
+                  borderRadius: "50%",
+                  display: "inline-block",
+                }}
+              ></span>
               {isUpdatingStatus ? "Cargando..." : isAvailable ? "Pasar a Inactivo" : "Pasar a Activo"}
             </button>
           </div>
@@ -547,11 +575,23 @@ export const DriverDashboardPage = () => {
             <LocationUpdater currentLocation={currentLocation} isTracking={isAvailable} />
           </div>
 
-          <div className="sidebar-box" style={{ background: "#fff", padding: "16px", borderRadius: "12px", border: "1px solid #eee" }}>
-            <h3 style={{ fontSize: "16px", marginBottom: "12px", color: "#333" }}>Datos del Vehículo</h3>
+          <div
+            className="sidebar-box"
+            style={{
+              background: "#fff",
+              padding: "16px",
+              borderRadius: "12px",
+              border: "1px solid #eee",
+            }}
+          >
+            <h3 style={{ fontSize: "16px", marginBottom: "12px", color: "#333" }}>
+              Datos del Vehículo
+            </h3>
             <form onSubmit={handleUpdateVehicleSubmit}>
               <div style={{ marginBottom: "12px" }}>
-                <label style={{ display: "block", fontSize: "12px", color: "#666", marginBottom: "4px" }}>Tipo de Vehículo</label>
+                <label style={{ display: "block", fontSize: "12px", color: "#666", marginBottom: "4px" }}>
+                  Tipo de Vehículo
+                </label>
                 <select
                   value={vehicleType}
                   onChange={(e) => setVehicleType(e.target.value)}
@@ -564,7 +604,9 @@ export const DriverDashboardPage = () => {
               </div>
 
               <div style={{ marginBottom: "12px" }}>
-                <label style={{ display: "block", fontSize: "12px", color: "#666", marginBottom: "4px" }}>Placa / Matrícula</label>
+                <label style={{ display: "block", fontSize: "12px", color: "#666", marginBottom: "4px" }}>
+                  Placa / Matrícula
+                </label>
                 <input
                   type="text"
                   value={vehiclePlate}
@@ -575,7 +617,9 @@ export const DriverDashboardPage = () => {
               </div>
 
               <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", fontSize: "12px", color: "#666", marginBottom: "4px" }}>Modelo / Marca</label>
+                <label style={{ display: "block", fontSize: "12px", color: "#666", marginBottom: "4px" }}>
+                  Modelo / Marca
+                </label>
                 <input
                   type="text"
                   value={vehicleModel}
@@ -596,7 +640,7 @@ export const DriverDashboardPage = () => {
                   border: "none",
                   borderRadius: "8px",
                   fontWeight: "bold",
-                  cursor: "pointer"
+                  cursor: "pointer",
                 }}
               >
                 {isUpdatingVehicle ? "Guardando..." : "Actualizar Vehículo"}
@@ -633,7 +677,7 @@ export const DriverDashboardPage = () => {
             {activeTab === "available" && (
               <div className="tab-pane">
                 <div className="pane-top-bar">
-                  <h3>Órdenes Disponibles</h3>
+                  <h3>Órdenes Listas para Entrega</h3>
                   <div className="search-box">
                     <input
                       type="text"
@@ -679,12 +723,28 @@ export const DriverDashboardPage = () => {
 
             {activeTab === "history" && (
               <div className="tab-pane">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justify: "space-between",
+                    alignItems: "center",
+                    marginBottom: "16px",
+                  }}
+                >
                   <h3 style={{ margin: 0 }}>Historial de Hoy</h3>
                   {completedOrders.length > 0 && (
                     <button
                       onClick={handleClearHistory}
-                      style={{ fontSize: "12px", color: "#888", border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}
+                      style={{
+                        fontSize: "12px",
+                        color: "#888",
+                        border: "none",
+                        background: "none",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
                     >
                       🗑️ Limpiar Historial Local
                     </button>
@@ -707,10 +767,14 @@ export const DriverDashboardPage = () => {
                         <tbody>
                           {completedOrders.map((ord, idx) => {
                             const orderId = ord._id || ord.id || ord.code || idx;
-                            const displayCode = ord.code || (ord._id ? `#${String(ord._id).slice(-6).toUpperCase()}` : `#ORD-${idx + 1}`);
+                            const displayCode =
+                              ord.code ||
+                              (ord._id ? `#${String(ord._id).slice(-6).toUpperCase()}` : `#ORD-${idx + 1}`);
                             const restName = ord.restaurant?.name || ord.restaurantName || "Restaurante";
                             const addr = ord.deliveryAddress || ord.address || "Dirección registrada";
-                            const totalVal = Number(ord.total || ord.deliveryFee || ord.price || ord.totalAmount || 0);
+                            const totalVal = Number(
+                              ord.total || ord.deliveryFee || ord.price || ord.totalAmount || 0
+                            );
 
                             return (
                               <tr key={orderId} style={{ borderBottom: "1px solid #f2f2f2" }}>
@@ -721,7 +785,16 @@ export const DriverDashboardPage = () => {
                                   S/ {totalVal.toFixed(2)}
                                 </td>
                                 <td style={{ padding: "12px" }}>
-                                  <span style={{ backgroundColor: "#e8f5e9", color: "#2e7d32", padding: "4px 8px", borderRadius: "4px", fontSize: "12px", fontWeight: "bold" }}>
+                                  <span
+                                    style={{
+                                      backgroundColor: "#e8f5e9",
+                                      color: "#2e7d32",
+                                      padding: "4px 8px",
+                                      borderRadius: "4px",
+                                      fontSize: "12px",
+                                      fontWeight: "bold",
+                                    }}
+                                  >
                                     ✓ Entregado
                                   </span>
                                 </td>

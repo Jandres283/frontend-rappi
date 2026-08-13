@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import api from "@/api/axios";
 import NewsTable from "@/components/Admin/News/NewsTable";
 import NewsModalForm from "@/components/Admin/News/NewsModalForm";
+import "./NewsPage.scss";
 
 export const NewsPage = () => {
   const [newsList, setNewsList] = useState([]);
@@ -10,40 +11,68 @@ export const NewsPage = () => {
   const [currentNews, setCurrentNews] = useState(null);
   const [reloadTrigger, setReloadTrigger] = useState(0);
 
-  // Cargar noticias desde la API
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterCategory, setFilterCategory] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
+
+  const parseNewsData = useCallback((data) => {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data.docs)) return data.docs;
+    if (Array.isArray(data.news)) return data.news;
+    if (Array.isArray(data.data)) return data.data;
+    return [];
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
 
     const fetchNews = async () => {
       try {
         setIsLoading(true);
-        const response = await api.get("/news?page=1&limit=50");
-        const data = response.data;
-        const list = Array.isArray(data) ? data : data?.docs || data?.news || [];
-        
-        if (isMounted) {
-          setNewsList(list);
-        }
+        const response = await api.get("/news");
+        const list = parseNewsData(response.data);
+        if (isMounted) setNewsList(list);
       } catch (error) {
         console.error("Error al cargar noticias:", error);
       } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        if (isMounted) setIsLoading(false);
       }
     };
 
     fetchNews();
-
     return () => {
       isMounted = false;
     };
-  }, [reloadTrigger]);
+  }, [reloadTrigger, parseNewsData]);
 
-  // Función para forzar la recarga tras crear, editar o eliminar
-  const reloadNews = () => {
-    setReloadTrigger((prev) => prev + 1);
+  const reloadNews = () => setReloadTrigger((prev) => prev + 1);
+
+  const isItemActive = (item) => {
+    return item.active === true || item.active === "true" || item.active === undefined;
   };
+
+  const stats = useMemo(() => {
+    const total = newsList.length;
+    const active = newsList.filter((n) => isItemActive(n)).length;
+    const inactive = total - active;
+    const promos = newsList.filter((n) => n.category === "Promociones").length;
+    return { total, active, inactive, promos };
+  }, [newsList]);
+
+  const filteredNews = useMemo(() => {
+    return newsList.filter((item) => {
+      const matchesSearch = item.title?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = filterCategory === "all" || item.category === filterCategory;
+      const activeState = isItemActive(item);
+      const matchesStatus =
+        filterStatus === "all" ||
+        (filterStatus === "active" && activeState) ||
+        (filterStatus === "inactive" && !activeState);
+
+      return matchesSearch && matchesCategory && matchesStatus;
+    });
+  }, [newsList, searchTerm, filterCategory, filterStatus]);
 
   const handleOpenCreate = () => {
     setCurrentNews(null);
@@ -55,73 +84,138 @@ export const NewsPage = () => {
     setIsModalOpen(true);
   };
 
-  // Guardar (Crear o Editar)
-  const handleSubmitForm = async (formData) => {
+  const handleSubmitForm = async (payload) => {
     try {
-      const isFormData = formData instanceof FormData;
-      const config = isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : {};
+      let formDataToSend;
+
+      if (payload instanceof FormData) {
+        formDataToSend = payload;
+      } else {
+        formDataToSend = new FormData();
+        Object.keys(payload).forEach((key) => {
+          if (payload[key] !== undefined && payload[key] !== null) {
+            formDataToSend.append(key, payload[key]);
+          }
+        });
+      }
 
       if (currentNews) {
         const id = currentNews._id || currentNews.id;
-        await api.patch(`/news/${id}`, formData, config);
+        await api.patch(`/news/${id}`, formDataToSend);
       } else {
-        await api.post("/news", formData, config);
+        await api.post("/news", formDataToSend);
       }
-      
+
       setIsModalOpen(false);
+      setCurrentNews(null);
+
+      // Reiniciar filtros para asegurar visibilidad inmediata
+      setSearchTerm("");
+      setFilterCategory("all");
+      setFilterStatus("all");
+
       reloadNews();
     } catch (error) {
       console.error("Error al procesar la noticia:", error);
-      alert(
-        "Error al procesar la noticia: " + 
-        (error.response?.data?.msg || error.response?.data?.message || error.message)
-      );
+      alert(error?.response?.data?.msg || "Error al guardar la noticia en el servidor.");
     }
   };
 
-  // Eliminar Noticia
   const handleDeleteNews = async (id) => {
-    if (!window.confirm("¿Estás seguro de que deseas eliminar esta noticia?")) return;
-
+    if (!window.confirm("¿Estás seguro de eliminar esta noticia?")) return;
     try {
       await api.delete(`/news/${id}`);
       reloadNews();
     } catch (error) {
       console.error("Error al eliminar la noticia:", error);
-      alert(
-        "Error al eliminar la noticia: " + 
-        (error.response?.data?.msg || error.response?.data?.message || error.message)
-      );
     }
   };
 
   return (
-    <div className="admin-page news-admin-page" style={{ padding: "1.5rem" }}>
-      <div className="admin-header-actions" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-        <div>
-          <h1 style={{ margin: 0 }}>Gestión de Novedades y Anuncios</h1>
-          <p style={{ color: "#666", margin: "0.5rem 0 0" }}>
-            Administración de banners, promociones globales y noticias para los usuarios.
-          </p>
+    <div className="news-dashboard">
+      <header className="dashboard-header">
+        <div className="header-title">
+          <h1>Panel de Control de Noticias</h1>
+          <p>Gestiona los anuncios, promociones y novedades visibles en la App.</p>
         </div>
-        <button 
-          className="btn-primary" 
-          onClick={handleOpenCreate}
-          style={{ padding: "0.6rem 1.2rem", background: "#e11d48", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}
-        >
-          + Nueva Noticia
+        <button className="btn-create-news" onClick={handleOpenCreate}>
+          <span className="icon">+</span> Crear Noticia
         </button>
-      </div>
+      </header>
 
-      <NewsTable
-        newsList={newsList}
-        onEdit={handleOpenEdit}
-        onDelete={handleDeleteNews}
-        isLoading={isLoading}
-      />
+      <section className="stats-grid">
+        <div className="stat-card">
+          <div className="stat-icon total">📰</div>
+          <div className="stat-info">
+            <span className="stat-value">{stats.total}</span>
+            <span className="stat-label">Total Noticias</span>
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-icon active">✅</div>
+          <div className="stat-info">
+            <span className="stat-value">{stats.active}</span>
+            <span className="stat-label">Publicadas (Visibles)</span>
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-icon inactive">⏸️</div>
+          <div className="stat-info">
+            <span className="stat-value">{stats.inactive}</span>
+            <span className="stat-label">Borradores / Ocultas</span>
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-icon promos">🔥</div>
+          <div className="stat-info">
+            <span className="stat-value">{stats.promos}</span>
+            <span className="stat-label">Promociones Activas</span>
+          </div>
+        </div>
+      </section>
+
+      <main className="dashboard-content">
+        <div className="content-toolbar">
+          <div className="search-box">
+            <span className="search-icon">🔍</span>
+            <input
+              type="text"
+              placeholder="Buscar noticia por título..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <div className="filters-box">
+            <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+              <option value="all">Todas las Categorías</option>
+              <option value="Novedades">Novedades</option>
+              <option value="Promociones">Promociones</option>
+              <option value="Ofertas">Ofertas</option>
+              <option value="Lanzamientos">Lanzamientos</option>
+            </select>
+
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+              <option value="all">Todos los Estados</option>
+              <option value="active">Visibles</option>
+              <option value="inactive">Ocultos</option>
+            </select>
+          </div>
+        </div>
+
+        <NewsTable
+          newsList={filteredNews}
+          onEdit={handleOpenEdit}
+          onDelete={handleDeleteNews}
+          isLoading={isLoading}
+        />
+      </main>
 
       <NewsModalForm
-        key={currentNews ? currentNews._id || currentNews.id : "new-modal"}
+        key={currentNews ? (currentNews._id || currentNews.id) : (isModalOpen ? "open" : "closed")}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleSubmitForm}

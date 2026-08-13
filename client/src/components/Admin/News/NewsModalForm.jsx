@@ -1,22 +1,24 @@
 import { useState } from "react";
+import "./NewsModalForm.scss";
 
-const NewsModalForm = ({ isOpen, onClose, onSubmit, currentNews }) => {
-  // Inicializamos derivando directamente de currentNews.
-  // Como en el componente padre le asignamos un `key` único cuando cambia `currentNews`,
-  // React destruirá y creará el estado con los valores actualizados sin necesitar useEffect.
-  const [formData, setFormData] = useState(() => ({
+export const NewsModalForm = ({ isOpen, onClose, onSubmit, currentNews }) => {
+  // Inicialización directa del estado según la noticia recibida
+  const [formData, setFormData] = useState({
     title: currentNews?.title || "",
-    category: currentNews?.category || "Lanzamientos",
-    content: currentNews?.content || "",
+    category: currentNews?.category || "Novedades",
+    content: currentNews?.content || currentNews?.description || "",
+    active: currentNews?.active ?? true,
     file: null,
-  }));
+  });
 
   if (!isOpen) return null;
 
   const handleChange = (e) => {
-    const { name, value, files } = e.target;
-    if (name === "file") {
+    const { name, value, files, type, checked } = e.target;
+    if (type === "file") {
       setFormData((prev) => ({ ...prev, file: files ? files[0] : null }));
+    } else if (type === "checkbox") {
+      setFormData((prev) => ({ ...prev, [name]: checked }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -29,8 +31,10 @@ const NewsModalForm = ({ isOpen, onClose, onSubmit, currentNews }) => {
       body.append("title", formData.title);
       body.append("category", formData.category);
       body.append("content", formData.content);
+      body.append("active", String(formData.active));
+
       if (formData.file) {
-        body.append("file", formData.file);
+        body.append("miniature", formData.file);
       }
 
       onSubmit(body);
@@ -49,14 +53,14 @@ const NewsModalForm = ({ isOpen, onClose, onSubmit, currentNews }) => {
 
         <form onSubmit={handleSubmit} className="modal-body">
           <div className="form-group">
-            <label htmlFor="news-title">Título</label>
+            <label htmlFor="news-title">Título del Anuncio</label>
             <input
               id="news-title"
               type="text"
               name="title"
               value={formData.title}
               onChange={handleChange}
-              placeholder="Ej. ¡Lanzamiento de Prime Delivery!"
+              placeholder="Ej. ¡2x1 en Promociones de Fin de Semana!"
               required
             />
           </div>
@@ -69,10 +73,10 @@ const NewsModalForm = ({ isOpen, onClose, onSubmit, currentNews }) => {
               value={formData.category}
               onChange={handleChange}
             >
-              <option value="Lanzamientos">Lanzamientos</option>
+              <option value="Novedades">Novedades</option>
               <option value="Promociones">Promociones</option>
               <option value="Ofertas">Ofertas</option>
-              <option value="Novedades">Novedades</option>
+              <option value="Lanzamientos">Lanzamientos</option>
             </select>
           </div>
 
@@ -81,16 +85,16 @@ const NewsModalForm = ({ isOpen, onClose, onSubmit, currentNews }) => {
             <textarea
               id="news-content"
               name="content"
-              rows="4"
+              rows="3"
               value={formData.content}
               onChange={handleChange}
-              placeholder="Escribe el detalle del anuncio..."
+              placeholder="Detalle de la noticia que leerán los usuarios..."
               required
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="news-file">Imagen de la Noticia</label>
+            <label htmlFor="news-file">Imagen promocional</label>
             <input
               id="news-file"
               type="file"
@@ -100,12 +104,25 @@ const NewsModalForm = ({ isOpen, onClose, onSubmit, currentNews }) => {
             />
           </div>
 
+          <div className="form-group checkbox-group">
+            <input
+              id="news-active"
+              type="checkbox"
+              name="active"
+              checked={formData.active}
+              onChange={handleChange}
+            />
+            <label htmlFor="news-active">
+              Publicar inmediatamente (Visible para el Cliente)
+            </label>
+          </div>
+
           <div className="modal-footer">
             <button type="button" className="btn-secondary" onClick={onClose}>
               Cancelar
             </button>
             <button type="submit" className="btn-primary">
-              {currentNews ? "Guardar Cambios" : "Crear Noticia"}
+              {currentNews ? "Guardar Cambios" : "Publicar Noticia"}
             </button>
           </div>
         </form>

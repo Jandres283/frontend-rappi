@@ -43,13 +43,14 @@ export const WebRouter = () => {
         <Route path="restaurants/:id" element={<RestaurantDetailPage />} />
 
         {/* Rutas exclusivas para el CLIENTE */}
-        <Route element={<RequireRole allowedRoles={[ROLES.CLIENT || "client"]} redirectTo="/auth" />}>
+        <Route element={<RequireRole allowedRoles={[ROLES?.CLIENT || "client"]} redirectTo="/auth" />}>
           <Route path="checkout" element={<CheckoutPage />} />
           <Route path="my-orders" element={<MyOrdersPage />} />
           <Route path="profile" element={<ProfilePage />} />
         </Route>
       </Route>
 
+      {/* Redirección comodín al home para rutas inexistentes */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

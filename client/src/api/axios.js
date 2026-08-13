@@ -3,9 +3,6 @@ import { ENV } from "@/utils/constants";
 
 const instance = axios.create({
   baseURL: ENV.API_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
 });
 
 // Interceptor para inyectar Token en cada petición
@@ -33,8 +30,6 @@ instance.interceptors.response.use(
     const status = error.response?.status;
     const requestUrl = error.config?.url || "";
 
-    // 🛑 IGNORAR Peticiones de Autenticación (Login / Register / Me)
-    // Evita mostrar "Sesión caducada" durante el proceso de autenticación
     const isAuthEndpoint =
       requestUrl.includes("/user/login") ||
       requestUrl.includes("/users/login") ||
@@ -55,7 +50,6 @@ instance.interceptors.response.use(
       localStorage.removeItem("auth_token_jwt");
       localStorage.removeItem("restaurantId");
 
-      // Redirigir inteligentemente según la ruta en la que se encuentra el usuario
       const currentPath = window.location.pathname;
       if (!currentPath.includes("/login") && !currentPath.includes("/register")) {
         if (currentPath.startsWith("/restaurant")) {

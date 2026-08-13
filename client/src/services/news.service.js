@@ -6,6 +6,8 @@ const buildFormData = (data) => {
     if (key === "file" || key === "miniature") {
       if (data[key] instanceof File) {
         formData.append("miniature", data[key]);
+      } else if (typeof data[key] === "string" && data[key].trim() !== "") {
+        formData.append("miniature", data[key]);
       }
     } else if (data[key] !== null && data[key] !== undefined) {
       formData.append(key, data[key]);
@@ -26,18 +28,14 @@ export const newsService = {
   },
 
   create: async (newsData) => {
-    const formData = buildFormData(newsData);
-    const response = await api.post("/news", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const formData = newsData instanceof FormData ? newsData : buildFormData(newsData);
+    const response = await api.post("/news", formData);
     return response.data;
   },
 
   update: async (id, newsData) => {
-    const formData = buildFormData(newsData);
-    const response = await api.patch(`/news/${id}`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const formData = newsData instanceof FormData ? newsData : buildFormData(newsData);
+    const response = await api.patch(`/news/${id}`, formData);
     return response.data;
   },
 

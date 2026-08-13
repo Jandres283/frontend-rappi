@@ -1,46 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  FiFilter, 
-  FiBookmark, 
-  FiClock, 
-  FiTag, 
-  FiChevronDown, 
-  FiChevronUp, 
-  FiArrowLeft, 
-  FiFileText, 
-  FiSearch, 
-  FiZap, 
-  FiGift, 
-  FiShare2, 
-  FiCheckCircle 
+  FiFilter, FiBookmark, FiClock, FiTag, FiChevronDown, 
+  FiChevronUp, FiArrowLeft, FiFileText, FiSearch, FiZap, FiGift, FiShare2, FiCheckCircle 
 } from 'react-icons/fi';
 
 import './NewsDetailPage.scss';
 
 const SERVER_HOST = import.meta.env.VITE_SERVER_HOST || 'http://localhost:3977';
 const API_URL = import.meta.env.VITE_API_URL || `${SERVER_HOST}/api/v1`;
-
-const MOCK_NEWS = [
-  {
-    _id: 'mock-1',
-    title: 'Lanzamiento de Prime Delivery con Envíos $0',
-    content: 'Ahora tus pedidos en restaurantes seleccionados tienen costo de envío totalmente gratis activando la suscripción mensual. ¡Aprovecha la prueba de 30 días gratis!',
-    category: 'Lanzamientos',
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-    isBookmarked: true,
-    imageUrl: 'https://images.unsplash.com/photo-1526367790999-0150786686a2?w=600&auto=format&fit=crop&q=60'
-  },
-  {
-    _id: 'mock-2',
-    title: '2x1 en Hamburguesas los días Martes y Jueves',
-    content: 'Pide en los locales adheridos a la promo Doble Sabor y recibe dos hamburguesas gourmet al precio de una. Válido pagando con cualquier medio de pago.',
-    category: 'Ofertas',
-    createdAt: new Date(Date.now() - 172800000).toISOString(),
-    isBookmarked: false,
-    imageUrl: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=60'
-  }
-];
 
 const capitalize = (str) => {
   if (!str) return '';
@@ -50,9 +18,14 @@ const capitalize = (str) => {
 const formatImage = (path) => {
   if (!path || typeof path !== 'string') return null;
   if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) return path;
+  
   let cleanPath = path.replace(/\\/g, '/').replace(/^\/+/, '');
   const host = SERVER_HOST.replace(/\/$/, '');
-  return cleanPath.startsWith('uploads/') ? `${host}/${cleanPath}` : `${host}/uploads/${cleanPath}`;
+
+  if (cleanPath.startsWith('uploads/')) {
+    return `${host}/${cleanPath}`;
+  }
+  return `${host}/uploads/${cleanPath}`;
 };
 
 export default function NewsDetailPage({ articles = [], onBack, onToggleBookmark }) {
@@ -72,59 +45,52 @@ export default function NewsDetailPage({ articles = [], onBack, onToggleBookmark
     return [];
   }, [articles]);
 
+  const [isLoading, setIsLoading] = useState(() => propList.length === 0);
+
   useEffect(() => {
     if (propList.length > 0) return;
+    
     let isMounted = true;
 
     fetch(`${API_URL}/news`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!isMounted || !data) return;
-        const list = Array.isArray(data) 
-          ? data 
-          : data?.docs || data?.data || data?.news || [];
-
-        if (list.length > 0) {
-          setFetchedNews(list);
-        }
+        const list = Array.isArray(data) ? data : data?.docs || data?.data || data?.news || [];
+        setFetchedNews(list);
       })
-      .catch((err) => console.warn('Error al conectar con API:', err));
+      .catch((err) => console.warn('Error al conectar con la API de noticias:', err))
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
 
     return () => { isMounted = false; };
   }, [propList.length]);
 
-  const newsList = useMemo(() => {
-    const primary = propList.length > 0 ? propList : fetchedNews;
-    if (primary.length === 0) return MOCK_NEWS;
-    
-    const combined = [...primary];
-    MOCK_NEWS.forEach((mock) => {
-      if (!combined.some((item) => item.title === mock.title)) {
-        combined.push(mock);
-      }
+  const activeNewsList = useMemo(() => {
+    const rawList = propList.length > 0 ? propList : fetchedNews;
+    return rawList.filter((item) => {
+      return item.active === true || item.active === "true" || item.active === undefined;
     });
-    return combined;
   }, [propList, fetchedNews]);
 
   const categories = useMemo(() => {
-    const list = newsList
+    const list = activeNewsList
       .map((item) => (item?.category ? capitalize(String(item.category).trim()) : null))
       .filter(Boolean);
     return ['Todas', ...Array.from(new Set(list))];
-  }, [newsList]);
+  }, [activeNewsList]);
 
   const filteredNews = useMemo(() => {
-    return newsList.filter((item) => {
+    return activeNewsList.filter((item) => {
       const itemCat = capitalize(String(item?.category || ''));
-      const matchCat =
-        selectedCategory === 'Todas' || itemCat.toLowerCase() === selectedCategory.toLowerCase();
-
+      const matchCat = selectedCategory === 'Todas' || itemCat.toLowerCase() === selectedCategory.toLowerCase();
       const titleMatch = (item?.title || '').toLowerCase().includes(searchTerm.toLowerCase());
-      const contentMatch = (item?.content || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const contentMatch = (item?.content || item?.description || '').toLowerCase().includes(searchTerm.toLowerCase());
 
       return matchCat && (titleMatch || contentMatch);
     });
-  }, [newsList, selectedCategory, searchTerm]);
+  }, [activeNewsList, selectedCategory, searchTerm]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -143,18 +109,10 @@ export default function NewsDetailPage({ articles = [], onBack, onToggleBookmark
     }
   };
 
-  const handleBackClick = () => {
-    if (onBack) {
-      onBack();
-    } else {
-      navigate(-1);
-    }
-  };
-
   return (
     <div className="news-container">
       <div className="header-bar">
-        <button onClick={handleBackClick} className="back-button">
+        <button onClick={() => (onBack ? onBack() : navigate(-1))} className="back-button">
           <FiArrowLeft /> Volver
         </button>
       </div>
@@ -177,32 +135,41 @@ export default function NewsDetailPage({ articles = [], onBack, onToggleBookmark
 
       <div className="main-layout">
         <main className="main-content">
-          <div className="filter-section">
-            <div className="category-group">
-              <FiFilter style={{ color: '#64748b' }} />
-              {categories.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`category-btn ${
-                    selectedCategory.toLowerCase() === cat.toLowerCase() ? 'active' : ''
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
+          {categories.length > 1 && (
+            <div className="filter-section">
+              <div className="category-group">
+                <FiFilter style={{ color: '#64748b' }} />
+                {categories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`category-btn ${
+                      selectedCategory.toLowerCase() === cat.toLowerCase() ? 'active' : ''
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="articles-list">
-            {filteredNews.length === 0 ? (
-              <div className="no-news">No se encontraron noticias disponibles.</div>
+            {isLoading ? (
+              <div className="loading-news">Cargando publicaciones...</div>
+            ) : filteredNews.length === 0 ? (
+              <div className="no-news">
+                <FiFileText size={48} style={{ color: '#94a3b8', marginBottom: '1rem' }} />
+                <h3>No hay publicaciones disponibles</h3>
+                <p>Las novedades y ofertas ingresadas por el administrador aparecerán aquí.</p>
+              </div>
             ) : (
               filteredNews.map((item, idx) => {
                 const id = item._id || item.id || `news-${idx}`;
                 const isExpanded = expandedId === id;
-                const imgUrl = formatImage(item.miniature || item.image || item.imageUrl);
+                const imgUrl = formatImage(item.miniature || item.file || item.image);
                 const isSaved = item.isBookmarked || false;
+                const contentText = item.content || item.description || '';
 
                 return (
                   <article key={id} className="news-card">
@@ -224,18 +191,14 @@ export default function NewsDetailPage({ articles = [], onBack, onToggleBookmark
                           {item.title}
                         </h2>
 
-                        <p className="news-excerpt">{item.content}</p>
+                        <p className="news-excerpt">{contentText}</p>
 
                         <div className="card-actions">
                           <button
                             onClick={() => setExpandedId(isExpanded ? null : id)}
                             className="toggle-btn"
                           >
-                            {isExpanded ? (
-                              <>Leer menos <FiChevronUp /></>
-                            ) : (
-                              <>Leer completo <FiChevronDown /></>
-                            )}
+                            {isExpanded ? <>Leer menos <FiChevronUp /></> : <>Leer completo <FiChevronDown /></>}
                           </button>
                           <button
                             onClick={() => {
@@ -278,7 +241,7 @@ export default function NewsDetailPage({ articles = [], onBack, onToggleBookmark
 
                     {isExpanded && (
                       <div className="expanded-detail">
-                        <p>{item.content}</p>
+                        <p>{contentText}</p>
                       </div>
                     )}
                   </article>

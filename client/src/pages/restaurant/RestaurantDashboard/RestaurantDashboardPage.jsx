@@ -208,6 +208,8 @@ export function RestaurantDashboardPage() {
   }, [user, userId]);
 
   // 2. WEBSOCKETS EN TIEMPO REAL
+  const myRestId = restaurantData?._id || restaurantData?.id || user?.restaurant;
+
   useEffect(() => {
     const socketHost = ENV?.SERVER_HOST || "http://localhost:3977";
 
@@ -219,7 +221,6 @@ export function RestaurantDashboardPage() {
     });
 
     socket.on("new_order", (newOrder) => {
-      const myRestId = restaurantData?._id || restaurantData?.id || user?.restaurant;
       const orderRestId = newOrder.restaurant?._id || newOrder.restaurant;
 
       if (!myRestId || String(orderRestId) === String(myRestId)) {
@@ -239,7 +240,7 @@ export function RestaurantDashboardPage() {
     return () => {
       socket.disconnect();
     };
-  }, [restaurantData, user]);
+  }, [myRestId]);
 
   const finalImageUrl = getImageUrl(restaurantData || user);
   const restaurantName = restaurantData?.name || user?.name || user?.firstName || "Mi Restaurante";
@@ -336,7 +337,14 @@ export function RestaurantDashboardPage() {
     }
   };
 
-  const totalVentasHoy = (orders || []).reduce(
+  // 🟢 FILTRAR EXCLUSIVAMENTE LOS PEDIDOS DEL RESTAURANTE CON ESTADO ENTREGADO
+  const deliveredOrders = (orders || []).filter((ord) => {
+    const st = (ord?.status || "").toUpperCase();
+    return st === "DELIVERED" || st === "ENTREGADO";
+  });
+
+  // 🟢 CALCULAR VENTAS DEL DÍA SOLO DE LOS PEDIDOS ENTREGADOS
+  const totalVentasHoy = deliveredOrders.reduce(
     (sum, ord) => sum + (parseFloat(ord?.total) || 0),
     0
   );
@@ -486,7 +494,7 @@ export function RestaurantDashboardPage() {
                   const isPreparing = currentStatus === "PREPARING" || currentStatus === "EN_PREPARACION";
                   const isReady = currentStatus === "READY" || currentStatus === "LISTO";
 
-                  // 🟢 EXTRACCIÓN DE DATOS DE CLIENTE (MEJORADA Y COMPATIBLE)
+                  // EXTRACCIÓN DE DATOS DE CLIENTE
                   const userObj = ord.user || ord.client || ord.customer;
                   
                   const userFirstName = userObj?.firstName || userObj?.firstname || userObj?.nombre || "";
@@ -525,7 +533,6 @@ export function RestaurantDashboardPage() {
                         </span>
                       </div>
 
-                      {/* 🟢 SECCIÓN DE CONTACTO MOSTRANDO CLIENTE REAL */}
                       <div className="order-client-info">
                         <p className="client-name">👤 {clientFullName}</p>
                         <p className="client-address">📍 {ord.address || "Para llevar / Pick Up"}</p>
@@ -623,13 +630,16 @@ export function RestaurantDashboardPage() {
                 <div className="metric-subtext positive">Activos en la carta</div>
               </div>
 
+              {/* 🟢 MÉTRICA DE VENTAS ACTUALIZADA PARA CONTABILIZAR ÚNICAMENTE PEDIDOS ENTREGADOS */}
               <div className="metric-box">
                 <div className="metric-header">
                   <span className="metric-title">Ventas Hoy</span>
                   <div className="metric-icon orange">$</div>
                 </div>
                 <div className="metric-value">S/ {totalVentasHoy.toFixed(2)}</div>
-                <div className="metric-subtext neutral">{orders.length} pedidos totales</div>
+                <div className="metric-subtext neutral">
+                  {deliveredOrders.length} {deliveredOrders.length === 1 ? "pedido entregado" : "pedidos entregados"}
+                </div>
               </div>
             </div>
 
@@ -721,7 +731,7 @@ export function RestaurantDashboardPage() {
         )}
       </main>
 
-      {/* MODAL CON SELECTOR DE ARCHIVOS */}
+      {/* MODAL PARA CREACIÓN DE PRODUCTOS */}
       {isModalOpen && (
         <div className="rappi-modal-backdrop">
           <div className="rappi-modal-box">
@@ -751,7 +761,7 @@ export function RestaurantDashboardPage() {
                   <label>Precio (S/) *</label>
                   <input
                     type="number"
-                    step="0.10"
+                    step="0.01"
                     value={newProduct.price}
                     onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
                     required
